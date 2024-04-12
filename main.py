@@ -1,19 +1,10 @@
-import json
-import sqlite3
-import sys
-import xml.etree.ElementTree as ET
-import pandas as pd
-import requests
-import os
-import winreg as reg
-from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QTableWidgetItem, QMessageBox, QDialog, QTextEdit,
     QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout, QFileDialog, QAbstractItemView, QCheckBox, QSizePolicy, QComboBox, QMainWindow
+    
     )
-
 class CustomTitleBar(QWidget):
     def __init__(self, parent=None):
         super(CustomTitleBar, self).__init__(parent)
@@ -155,10 +146,12 @@ API & API 병합을 위해:
         self.setLayout(layout)
 
 class ApiCall:
+
     def __init__(self, api_cache):
         self.ch = api_cache  # APICache 인스턴스를 인스턴스 변수로 저장합니다.
 
     def call_params(self, key, url, **kwargs):
+        from urllib.parse import urlencode, urljoin
         params = {'dataType': 'XML', 'serviceKey': key}
 
         for v in kwargs.keys():
@@ -169,6 +162,7 @@ class ApiCall:
         return self.call_with_url(url)
         
     def call_with_url(self, url):
+        import requests
         if url in self.ch.cache:
             return self.ch.cache[url]
         else:
@@ -186,6 +180,7 @@ class ApiCall:
         self.ch.set(cache_key, response)  # Cache the successful response
         
 class RegistryManager:
+    
     def __init__(self):
         self.reg_path = r"Software\Kwater\APIDOWNLOADER"
         self.backup_reg_path = r"Software\Kwater\APIDOWNLOADER\Backup"
@@ -194,6 +189,7 @@ class RegistryManager:
 
     def load_settings(self):
         """레지스트리에서 설정을 로드합니다."""
+        import winreg as reg
         settings = {}
         try:
             with reg.OpenKey(reg.HKEY_CURRENT_USER, self.reg_path, 0, reg.KEY_READ) as key:
@@ -214,6 +210,7 @@ class RegistryManager:
 
     def save_settings(self, id_url_list):
         """설정을 레지스트리에 저장합니다."""
+        import winreg as reg
         try:
             # 새로운 값 맨 앞에 추가하고, 기존의 값들을 뒤로 밀어내기
             new_id, new_url = id_url_list[0]  # 새로운 값
@@ -239,6 +236,10 @@ class RegistryManager:
 
     def recover_param_db_from_registry(self, db_path):
         """레지스트리 백업에서 param_db 파일의 데이터를 복구합니다."""
+        import winreg as reg
+        import os
+        import sqlite3
+        from urllib.parse import parse_qs, urlparse
         try:
             # 데이터베이스 파일 생성
             if not os.path.exists(db_path):
@@ -292,16 +293,18 @@ class RegistryManager:
         except Exception as e:
             QMessageBox.critical(None, "복구 실패", f"데이터베이스 복구 중 오류 발생: {e}")
 
-class ParameterSaver: ## 클래스 이름 변경 필요하지않나?
+class ParameterSaver:
     db_connection = None
     db_cursor = None
     
-    def __init__(self, id, url): ## id, url이 필요 없는 메서드도 있음
+    def __init__(self, id, url):
         self.id = id
         self.url = url
 
     @staticmethod
     def F_connectPostDB():
+        import sqlite3
+        import os
         db_path = 'params_db.sqlite'
         
         if not os.path.exists(db_path):
@@ -368,6 +371,8 @@ class ParameterSaver: ## 클래스 이름 변경 필요하지않나?
             ParameterSaver.db_cursor = None
 
     def save_parameters(self):
+        from urllib.parse import parse_qs, urlparse
+        import sqlite3
         # 데이터베이스 연결
         self.F_connectPostDB()
         if ParameterSaver.db_connection is None or ParameterSaver.db_cursor is None:
@@ -402,6 +407,7 @@ class ParameterSaver: ## 클래스 이름 변경 필요하지않나?
             self.F_ConnectionClose()
 
     def delete_row(self, id):
+        import sqlite3
         try:
             # 선택된 ID의 행 전체 삭제
             connection, cursor = ParameterSaver.F_connectPostDB()
@@ -420,6 +426,7 @@ class ParameterSaver: ## 클래스 이름 변경 필요하지않나?
                 ParameterSaver.F_ConnectionClose()
 
     def get_params(self, id):
+        import sqlite3
         try:
             connection, cursor = ParameterSaver.F_connectPostDB()
             if connection is not None and cursor is not None:
@@ -437,9 +444,11 @@ class ParameterSaver: ## 클래스 이름 변경 필요하지않나?
                 ParameterSaver.F_ConnectionClose()
 
     def load_parameter_list(param_table):
+        import sqlite3
         connection, cursor = ParameterSaver.F_connectPostDB()
         if not connection or not cursor:
             return
+
         try:
             cursor.execute("SELECT * FROM URL_TB")
             rows = cursor.fetchall()
@@ -546,6 +555,7 @@ class ParameterViewer(QWidget):
         self.on_confirm_button_clicked()
 
     def on_delete_button_clicked(self):
+        import sqlite3
         selected_items = self.param_table.selectedItems()
         if selected_items:
             selected_row = selected_items[0].row()
@@ -559,6 +569,7 @@ class ParameterViewer(QWidget):
             QMessageBox.warning(None, '경고', '선택된 행이 없습니다.')
 
     def on_confirm_button_clicked(self):
+        import sqlite3
         selected_items = self.param_table.selectedItems()
         if selected_items:
             selected_row = selected_items[0].row()
@@ -580,9 +591,8 @@ class ParameterViewer(QWidget):
                         rows = parameter_saver.get_params(id)
 
                         self.widget_instance.api_input.setText(rows[0][0])
-
+                        
                         parameters = {}
-
                         for row in rows[2:]:
                             key, value = row[0].split("=", 1)
                             if key == 'serviceKey':
@@ -610,6 +620,7 @@ class ParameterViewer(QWidget):
 
 class MyWidget(QWidget):
     def __init__(self, api_cache):
+        import pandas as pd
         super().__init__()
         self.df_data = pd.DataFrame() # 데이터 프레임?!!?
         self.origin_data = None
@@ -641,8 +652,8 @@ class MyWidget(QWidget):
 
         self.api_label = QLabel('API URL')
         self.api_input = EnterLineEdit(self)
-        self.api_input.setToolTip('서비스URL을 입력하세요.')
         self.add_param_to_layout(self.fixed_layout, self.api_label, self.api_input)
+        self.api_input.setToolTip("API의 URL을 입력하세요.")
 
         self.key_label = QLabel('serviceKey')
         self.key_input = EnterLineEdit(self)
@@ -699,6 +710,7 @@ class MyWidget(QWidget):
         self.setLayout(main_layout)
 
     def onTextChanged(self):
+        import pandas as pd
         # input 텍스트가 변경되면 api_data를 None으로 설정
         self.df_data = pd.DataFrame()
         self.origin_data = None
@@ -964,6 +976,7 @@ class DataDownload:
             QMessageBox.information(None, '알림', 'csv 파일 저장 실패!')
 
     def save_json(self, file_path):
+        import json
         try:
             with open(file_path, 'w', encoding='utf-8') as file:
                 json.dump(self.api_data.to_dict(orient='records'), file, ensure_ascii=False, indent=4)
@@ -972,6 +985,7 @@ class DataDownload:
             QMessageBox.information(None, '알림', 'JSON 파일 저장 실패!')
             
     def save_xlsx(self, file_path):
+        import pandas as pd
         try:
         # 엑셀 파일로 저장할 때는 ExcelWriter 객체를 생성하여 사용
             with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
@@ -981,12 +995,14 @@ class DataDownload:
             QMessageBox.information(None, '알림', '엑셀 파일 저장 실패!')
                 
 def fetch_data(xml_data):
+    import pandas as pd
     data = parse_xml_to_dict(xml_data)
     df = pd.DataFrame(data)
     return df
 
 def parse_xml_to_dict(xml_data): 
     data_list = []
+    import xml.etree.ElementTree as ET
     try:
         root = ET.fromstring(xml_data)
         if root.findall('.//item'):
@@ -1072,6 +1088,7 @@ class DataJoinerApp(QWidget):
         self.parameter_viewer.show()
 
     def join_data(self):
+        import pandas as pd
         join_column1 = self.join_column1_combobox.currentText()
         join_column2 = self.join_column2_combobox.currentText()
 
@@ -1138,8 +1155,11 @@ class MainApp(QMainWindow):
 
         self.registry_manager = RegistryManager()
         self.settings = self.registry_manager.load_settings()
+
+        # Initially set these to None to indicate they're not loaded yet
         self.myWidgetApp = None
         self.dataJoiner = None
+
         self.initUI()
         self.setStyleSheet("QMainWindow {background: 'white';}")
     
@@ -1162,7 +1182,7 @@ class MainApp(QMainWindow):
         
         centralWidget.setLayout(hbox)
         
-        # 커스텀 타이틀 바 설정
+        # Custom title bar setup
         self.custom_title_bar = CustomTitleBar(self)
         self.setMenuWidget(self.custom_title_bar)
 
@@ -1177,6 +1197,7 @@ class MainApp(QMainWindow):
         self.dataJoiner.show()  # DataJoinerApp 표시
 
 if __name__ == '__main__':
+    import sys
     app = QApplication.instance()  # 기존 인스턴스 확인
     if not app:  # 인스턴스가 없을 경우 새로 생성
         app = QApplication(sys.argv)
