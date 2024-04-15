@@ -15,10 +15,10 @@ class CustomTitleBar(QWidget):
     def initUI(self):
         self.setAutoFillBackground(True)
         self.setBackgroundRole(QPalette.Highlight)
-        self.setFixedHeight(40)  # Adjust the height dynamically if needed
+        self.setFixedHeight(40)  
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  # Adjust to make sure there's no unwanted padding
+        layout.setContentsMargins(0, 0, 0, 0)  
 
         # Version title setup
         self.title = QLabel("Version 1.0.0", self)
@@ -102,6 +102,7 @@ class HelpDialog(QDialog):
         super(HelpDialog, self).__init__(parent)
         self.setWindowTitle("Help")
         self.resize(600, 400)
+        
         layout = QVBoxLayout(self)
 
         help_text = """
@@ -191,49 +192,52 @@ class RegistryManager:
         self.load_settings()  # 인스턴스가 생성될 때 설정을 불러오도록 수정합니다.
 
     def load_settings(self):
-        """레지스트리에서 설정을 로드합니다."""
         import winreg as reg
+        """레지스트리에서 설정을 로드합니다. 키가 없으면 무시합니다."""
         settings = {}
         try:
             with reg.OpenKey(reg.HKEY_CURRENT_USER, self.reg_path, 0, reg.KEY_READ) as key:
                 for i in range(self.recent_entries_max):
-                    try:
-                        id_val = reg.QueryValueEx(key, f"ID_{i}")[0]
-                        url_val = reg.QueryValueEx(key, f"URL_{i}")[0]
+                    id_val, url_val = self.get_registry_value(key, f"ID_{i}"), self.get_registry_value(key, f"URL_{i}")
+                    if id_val is not None and url_val is not None:
                         settings[f"ID_{i}"] = id_val
                         settings[f"URL_{i}"] = url_val
-                    except WindowsError as e:
-                        print(f"Error reading registry for index {i}: {e}")
-                        break  # 레지스트리 값이 더 이상 없으면 반복문 종료
         except FileNotFoundError:
             print("레지스트리 경로를 찾을 수 없습니다.")
         except Exception as e:
             print(f"레지스트리 로딩 중 오류 발생: {e}")
         return settings
+    
+    def get_registry_value(self, key, name):
+        import winreg as reg
+        """레지스트리에서 값을 안전하게 조회합니다."""
+        try:
+            return reg.QueryValueEx(key, name)[0]
+        except WindowsError:
+            return None
+
 
     def save_settings(self, id_url_list):
-        """설정을 레지스트리에 저장합니다."""
         import winreg as reg
+        """레지스트리에 설정을 저장합니다."""
         try:
-            # 새로운 값 맨 앞에 추가하고, 기존의 값들을 뒤로 밀어내기
-            new_id, new_url = id_url_list[0]  # 새로운 값
             with reg.CreateKey(reg.HKEY_CURRENT_USER, self.reg_path) as key:
-                # 기존 값들을 하나씩 뒤로 밀기
-                for i in range(self.recent_entries_max - 2, -1, -1):
+                # 새로운 값 맨 앞에 추가
+                new_id, new_url = id_url_list[0]
+                # 기존 값들을 뒤로 밀기
+                for i in range(self.recent_entries_max - 1, 0, -1):
                     try:
-                        # 현재 값 읽기
-                        current_id = reg.QueryValueEx(key, f"ID_{i}")[0]
-                        current_url = reg.QueryValueEx(key, f"URL_{i}")[0]
-                        # 다음 위치로 이동
-                        reg.SetValueEx(key, f"ID_{i+1}", 0, reg.REG_SZ, current_id)
-                        reg.SetValueEx(key, f"URL_{i+1}", 0, reg.REG_SZ, current_url)
+                        prev_id, _ = reg.QueryValueEx(key, f"ID_{i-1}")
+                        prev_url, _ = reg.QueryValueEx(key, f"URL_{i-1}")
+                        reg.SetValueEx(key, f"ID_{i}", 0, reg.REG_SZ, prev_id)
+                        reg.SetValueEx(key, f"URL_{i}", 0, reg.REG_SZ, prev_url)
                     except WindowsError:
-                        continue  # 이전 값이 없는 경우 건너뛰기
-                
+                        # 이전 값이 없으면 이 위치에서 멈추고 반복을 중단
+                        break
+
                 # 새로운 값 맨 앞에 저장
                 reg.SetValueEx(key, "ID_0", 0, reg.REG_SZ, new_id)
                 reg.SetValueEx(key, "URL_0", 0, reg.REG_SZ, new_url)
-                
         except Exception as e:
             print(f"Settings saving error: {e}")
 
@@ -304,6 +308,17 @@ class ParameterSaver:
         self.id = id
         self.url = url
 
+    def is_first_run():
+        import os
+        config_path = 'app_config.txt'
+        if not os.path.exists(config_path):
+            # 설정 파일이 없으면 첫 실행으로 간주
+            with open(config_path, 'w') as f:
+                f.write('run=true')
+            return True
+        return False
+    
+    
     @staticmethod
     def F_connectPostDB():
         import sqlite3
@@ -311,24 +326,22 @@ class ParameterSaver:
         db_path = 'params_db.sqlite'
         
         if not os.path.exists(db_path):
-            reply = QMessageBox.question(None, '데이터베이스 손상!', '데이터베이스 손상! 복구하시겠습니까?',
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                                         
-            if reply == QMessageBox.No:
-                secondaryReply = QMessageBox.question(None, '주의', '복구하지 않으면 저장된 데이터는 모두 소실됩니다. 정말 복구하지 않겠습니까?',
-                                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                                                      
-                if secondaryReply == QMessageBox.No:
-                    # 사용자가 최종적으로 복구를 선택한 경우
-                    ParameterSaver.recover_database(db_path)
-                else:
-                    # 사용자가 복구를 원하지 않는 경우, 빈 파일 생성
-                    open(db_path, 'a').close()
+            if ParameterSaver.is_first_run():
+                open(db_path, 'a').close()
+                print("첫 설정: 데이터베이스 생성됨.")
             else:
-                # 복구를 선택한 경우
-                ParameterSaver.recover_database(db_path)
-                
-        # 데이터베이스 연결 시도 및 스키마 초기화
+                reply = QMessageBox.question(None, '데이터베이스 손상!', '데이터베이스 손상! 복구하시겠습니까?',
+                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if reply == QMessageBox.No:
+                    secondaryReply = QMessageBox.question(None, '주의', '복구하지 않으면 저장된 데이터는 모두 소실됩니다. 정말 복구하지 않겠습니까?',
+                                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if secondaryReply == QMessageBox.No:
+                        ParameterSaver.recover_database(db_path)
+                    else:
+                        open(db_path, 'a').close()
+                else:
+                    ParameterSaver.recover_database(db_path)
+
         try:
             ParameterSaver.db_connection = sqlite3.connect(db_path)
             ParameterSaver.db_cursor = ParameterSaver.db_connection.cursor()
