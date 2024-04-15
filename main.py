@@ -523,11 +523,10 @@ class APICache:
                 oldest_key = next(iter(self.cache))  # 가장 오래된 항목의 키를 가져옵니다.
                 del self.cache[oldest_key]  # 가장 오래된 항목을 제거합니다.
         self.cache[key] = value
-        
+
     def clear(self):
         """캐시 초기화"""
         self.cache.clear()
-        self.keys.clear()
 
 class ParameterViewer(QWidget):
     def __init__(self, widget_instance, api_cache, parent_widget_type, target_url_field="api_url1_edit"):
