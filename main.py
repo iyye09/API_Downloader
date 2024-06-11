@@ -1,156 +1,13 @@
+import os
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPalette
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QTableWidgetItem, QMessageBox, QDialog, QTextEdit,
-    QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout, QFileDialog, QAbstractItemView, QCheckBox, QSizePolicy, QComboBox, QMainWindow
+    QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout, QFileDialog, QAbstractItemView, QCheckBox, QSizePolicy, QComboBox, QMainWindow,
+    QMenuBar, QAction
     )
-
-class CustomTitleBar(QWidget):
-    def __init__(self, parent=None):
-        super(CustomTitleBar, self).__init__(parent)
-        self.parent = parent  # Store a reference to the parent window
-        self.mousePressed = False
-        self.initUI()
-
-    def initUI(self):
-        self.setAutoFillBackground(True)
-        self.setBackgroundRole(QPalette.Highlight)
-        self.setFixedHeight(40)  
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)  
-
-        # Version title setup
-        self.title = QLabel("Version 1.0.0", self)
-        self.title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        layout.addWidget(self.title)
-
-        # Tool buttons (minimize, maximize/restore, close)
-        self.minimizeButton = QPushButton("─", self)
-        self.maximizeButton = QPushButton("☐", self)
-        self.closeButton = QPushButton("✕", self)
-        self.helpButton = QPushButton("?", self)
-
-        self.minimizeButton.clicked.connect(self.parent.showMinimized)
-        self.maximizeButton.clicked.connect(self.toggleMaximizeRestore)
-        self.closeButton.clicked.connect(self.parent.close)
-        self.helpButton.clicked.connect(self.showHelp)
-
-        # Add buttons to the layout
-        for button in [self.helpButton, self.minimizeButton, self.maximizeButton, self.closeButton]:
-            layout.addWidget(button)
-            button.setFixedSize(35, 35)  # Example size, adjust as needed
-
-        self.setLayout(layout)
-
-    def defineToolButtons(self):
-        self.minimize_button = QPushButton("ㅡ", self)
-        self.minimize_button.clicked.connect(lambda: self.parent().showMinimized())
-
-        self.maximize_button = QPushButton("☐", self)
-        self.maximize_button.clicked.connect(self.toggleMaximizeRestore)
-
-        self.close_button = QPushButton("✕", self)
-        self.close_button.clicked.connect(lambda: self.parent().close())
-
-        self.normal_button = QPushButton("🗗", self)
-        self.normal_button.clicked.connect(lambda: self.parent().showNormal())
-        self.normal_button.setVisible(False)
-
-        self.help_Button = QPushButton("?", self)
-        self.help_Button.clicked.connect(self.showHelp)
-    
-
-    def adjustHeight(self):
-        max_height = max([widget.sizeHint().height() for widget in self.children() if isinstance(widget, QPushButton)])
-        padding = 10  # Add some padding
-        self.setFixedHeight(max_height + padding)
-
-    def mousePressEvent(self, event):
-        self.mousePressed = True
-        self.mousePos = event.globalPos()
-
-    def mouseMoveEvent(self, event):
-        if self.mousePressed:
-            # Calculate the difference and move the window
-            diff = event.globalPos() - self.mousePos
-            self.parent.move(self.parent.pos() + diff)
-            self.mousePos = event.globalPos()
-
-    def mouseReleaseEvent(self, event):
-        self.mousePressed = False
-
-    def mouseDoubleClickEvent(self, event):
-        self.toggleMaximizeRestore()
-
-    def toggleMaximizeRestore(self):
-        if self.parent.isMaximized():
-            self.parent.showNormal()
-            self.maximizeButton.setText("☐")
-        else:
-            self.parent.showMaximized()
-            self.maximizeButton.setText("🗗")
-    
-
-    def showHelp(self):
-        help_dialog = HelpDialog(self)
-        help_dialog.exec_()
-
-
-class HelpDialog(QDialog):
-    def __init__(self, parent=None):
-        super(HelpDialog, self).__init__(parent)
-        self.setWindowTitle("Help")
-        self.resize(600, 400)
-        
-        layout = QVBoxLayout(self)
-
-        help_text = """
-이 프로그램은 API를 호출하고 API간 병합을 도와주는 프로그램 입니다.
-
-기능:
-
-- API 호출: API_URL과 서비스 키 값 그리고 여러 요청 변수들을 입력받아 사용자가 원하는 데이터를 호출하여 파일로 저장하게 도와줍니다.
-
-- API & API 병합: 2개의 호출된 데이터를 바탕으로 사용자가 원하는 새 데이터를 만들어 줍니다. 조인은 같은 내용을 바탕으로 한 칼럼끼리만 가능합니다.
-
-- 캐시 기반 데이터 호출 및 조인을 지원하여 최근 불러온 데이터는 더 빠르게 불러올 수 있습니다.
-
-- 레지스트리 기반 데이터 저장을 지원합니다. sqlite파일이 제거되어도 최신 10개의 데이터는 유지됩니다.
-
-사용 방법:
-
-1. API 호출을 위해 먼저 API 주소, 서비스 키 값을 입력합니다.
-
-2. 데이터 입력시 요청변수와 해당 값들을 추가/제거하여 입력합니다.
-
-3. OpenAPI 호출 버튼을 눌러 API를 호출하고, 결과 데이터를 확인합니다.
-
-4. 호출된 데이터를 저장하고 싶다면 원하는 형식을 선택하여 저장합니다.
-
-API & API 병합을 위해:
-
-1. 병합하고 싶은 데이터를 입력합니다. 이전에 호출 목록에서 저장된 데이터만 가능합니다.
-
-2. 병합하고 싶은 데이터들간의 기준을 설정합니다.
-
-3. 데이터 조인을 통해 새로운 데이터를 생성합니다.
-"""
-        
-        self.help_text_edit = QTextEdit()
-        self.help_text_edit.setText(help_text)
-        self.help_text_edit.setReadOnly(True)
-        
-        layout.addWidget(self.help_text_edit)
-        
-        close_button = QPushButton("닫기")
-        close_button.clicked.connect(self.accept)
-        layout.addWidget(close_button)
-        
-        self.setLayout(layout)
         
 class ApiCall:
-
     def __init__(self, api_cache):
         self.ch = api_cache  # APICache 인스턴스를 인스턴스 변수로 저장합니다.
 
@@ -184,7 +41,6 @@ class ApiCall:
     
         
 class RegistryManager:
-    
     def __init__(self):
         self.reg_path = r"Software\Kwater\APIDOWNLOADER"
         self.backup_reg_path = r"Software\Kwater\APIDOWNLOADER\Backup"
@@ -317,7 +173,6 @@ class ParameterSaver:
                 f.write('run=true')
             return True
         return False
-    
     
     @staticmethod
     def F_connectPostDB():
@@ -512,21 +367,25 @@ class APICache:
     def __init__(self, capacity=10):
         self.cache = {}
         self.capacity = capacity
+        self.keys = []
 
     def get(self, key):
-        return self.cache[key]
-    
+        """API 결과 반환. 캐시에 없으면 None 반환"""
+        return self.cache.get(key, None)
+
     def set(self, key, value):
         """API 호출 결과 캐시에 저장. 캐시가 가득 차면 가장 오래된 항목 제거"""
         if key not in self.cache:
-            if len(self.cache) >= self.capacity:
-                oldest_key = next(iter(self.cache))  # 가장 오래된 항목의 키를 가져옵니다.
-                del self.cache[oldest_key]  # 가장 오래된 항목을 제거합니다.
+            if len(self.keys) >= self.capacity:
+                oldest_key = self.keys.pop(0)
+                del self.cache[oldest_key]
+            self.keys.append(key)
         self.cache[key] = value
 
     def clear(self):
         """캐시 초기화"""
         self.cache.clear()
+        self.keys.clear()
 
 class ParameterViewer(QWidget):
     def __init__(self, widget_instance, api_cache, parent_widget_type, target_url_field="api_url1_edit"):
@@ -602,8 +461,6 @@ class ParameterViewer(QWidget):
         else:
             QMessageBox.warning(None, '경고', '선택된 행이 없습니다.')
 
-
-
     def on_confirm_button_clicked(self):
         import sqlite3
         selected_items = self.param_table.selectedItems()
@@ -673,7 +530,6 @@ class MyWidget(QWidget):
         self.param_grid_col = 0  # 변경: 첫 번째 파라미터부터 첫 번째 열에 배치
         self.max_cols = 3  # 한 행에 최대 파라미터 개수
         self.setup()  # UI 설정
-        self.setWindowFlags(Qt.FramelessWindowHint)
         self.api_cache = api_cache
 
     def setup(self):
@@ -685,8 +541,8 @@ class MyWidget(QWidget):
 
         main_layout = QVBoxLayout()  # 먼저 메인 레이아웃을 생성합니다.
 
-        self.custom_title_bar = CustomTitleBar(self)  # 사용자 정의 타이틀 바 인스턴스 생성 및 추가
-        main_layout.addWidget(self.custom_title_bar)  # 여기서 메인 레이아웃에 추가합니다.
+        # self.custom_title_bar = CustomTitleBar(self)  # 사용자 정의 타이틀 바 인스턴스 생성 및 추가
+        # main_layout.addWidget(self.custom_title_bar)  # 여기서 메인 레이아웃에 추가합니다.
 
         self.fixed_layout = QVBoxLayout()
         main_layout.addLayout(self.fixed_layout)
@@ -1073,18 +929,10 @@ class DataJoinerApp(QWidget):
         self.initUI()
 
     def initUI(self):
-        # Window flags are adjusted to allow for a custom title bar
-        self.setWindowFlags(Qt.FramelessWindowHint)
         self.setGeometry(700, 700, 700, 700)
 
         # Layout for the entire widget
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        # Custom title bar is created and added first
-        self.custom_title_bar = CustomTitleBar(self)
-        layout.addWidget(self.custom_title_bar)
 
         # Input fields for API URLs
         self.api_url1_edit = QLineEdit(self)
@@ -1153,9 +1001,6 @@ class DataJoinerApp(QWidget):
         elif not self.join_column1_combobox.currentText():
             QMessageBox.warning(self, '경고', '첫 번째 API URL을(를) 선택해야 합니다!')
             return
-        
-        # self.df1 = fetch_data(api_url_1)
-        # self.df2 = fetch_data(api_url_2)
 
         if self.df1 is None or self.df2 is None:
             QMessageBox.critical(self, '오류', '데이터를 가져오는 데 실패했습니다. API URL을 확인해주세요.')
@@ -1199,10 +1044,21 @@ class DataJoinerApp(QWidget):
         else:
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
+class HelpWindow(QMainWindow):
+    def __init__(self, help_text):
+        super().__init__()
+        self.setWindowTitle('정보')
+        self.setGeometry(300, 300, 600, 400)
+        
+        # TextEdit 위젯을 중앙에 배치
+        self.text_edit = QTextEdit(self)
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setText(help_text)
+        self.setCentralWidget(self.text_edit)
+
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.api_cache = APICache()
 
         self.registry_manager = RegistryManager()
@@ -1217,27 +1073,56 @@ class MainApp(QMainWindow):
     
     def initUI(self):
         self.setWindowTitle('API')
-        self.setGeometry(600, 600, 600, 600)
+        self.setGeometry(600, 600, 600, 300)
         
         centralWidget = QWidget()
         self.setCentralWidget(centralWidget)
         
         hbox = QVBoxLayout()
+        
         btn1 = QPushButton('API 호출', centralWidget)
         btn1.clicked.connect(self.showMyWidgetApp)
+        btn1.setStyleSheet("font-size: 20px")  # 버튼의 텍스트 크기를 설정
         
         btn2 = QPushButton('API && API 병합', centralWidget)
         btn2.clicked.connect(self.showDataJoinerApp)
+        btn2.setStyleSheet("font-size: 20px")  # 버튼의 텍스트 크기를 설정
+        
+        # 버튼 크기를 반반씩 꽉 차게 설정
+        btn1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        btn2.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         hbox.addWidget(btn1)
         hbox.addWidget(btn2)
         
         centralWidget.setLayout(hbox)
-        
-        # Custom title bar setup
-        self.custom_title_bar = CustomTitleBar(self)
-        self.setMenuWidget(self.custom_title_bar)
 
+        # Menu Bar
+        menu_bar = QMenuBar(self)
+        help_menu = menu_bar.addMenu('도움말')
+        help_action = QAction('정보', self)
+        help_action.triggered.connect(self.show_help)
+        help_menu.addAction(help_action)
+        
+        hbox.setMenuBar(menu_bar)
+
+    def show_help(self):
+        # 도움말 텍스트 파일 읽기
+        try:
+            # __file__ 변수가 정의되지 않은 경우를 처리
+            help_file_path = os.path.join(os.path.dirname(__file__), 'README.txt')
+        except NameError:
+            # __file__ 변수가 정의되지 않은 경우, 실행 경로를 기준으로 설정
+            help_file_path = os.path.join(os.getcwd(), 'README.txt')
+
+        try:
+            with open(help_file_path, 'r', encoding='utf-8') as file:
+                help_text = file.read()
+        except Exception as e:
+            help_text = f"도움말 파일을 읽는 데 오류가 발생했습니다: {e}"
+        
+        self.help_window = HelpWindow(help_text)
+        self.help_window.show()
 
     def showMyWidgetApp(self):
         if self.myWidgetApp is None:  # MyWidget 인스턴스가 없으면 생성
